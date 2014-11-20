@@ -94,7 +94,7 @@ Imagemin.prototype.run = function (cb) {
 		cb(null, files, pipe);
 	});
 
-	pipe.on('error', cb);
+	pipe.on('error', function(cb){console.error(cb)});
 	pipe.pipe(end);
 };
 

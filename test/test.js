@@ -157,6 +157,7 @@ test('output error on corrupt images', function (t) {
 		.use(Imagemin.jpegtran());
 
 	imagemin.run(function (err) {
+		//console.error(err);
 		t.assert(err);
 	});
 });
