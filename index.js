@@ -1,11 +1,11 @@
 'use strict';
 
-var combine = require('stream-combiner');
+var bufferToVinyl = require('buffer-to-vinyl');
+var combine = require('stream-combiner2');
 var concat = require('concat-stream');
-var File = require('vinyl');
-var fs = require('vinyl-fs');
 var optional = require('optional');
 var through = require('through2');
+var vfs = require('vinyl-fs');
 
 /**
  * Initialize Imagemin
@@ -75,48 +75,47 @@ Imagemin.prototype.use = function (plugin) {
 Imagemin.prototype.run = function (cb) {
 	cb = cb || function () {};
 
-	if (!this.streams.length) {
+	var stream = this.createStream();
+
+	stream.on('error', cb);
+	stream.pipe(concat(cb.bind(null, null)));
+};
+
+/**
+ * Create stream
+ *
+ * @api private
+ */
+
+Imagemin.prototype.createStream = function () {
+	this.streams.unshift(this.getFiles());
+
+	if (this.streams.length === 1) {
 		this.use(Imagemin.gifsicle());
 		this.use(Imagemin.jpegtran());
-		this.use(Imagemin.pngquant());
 		this.use(Imagemin.optipng());
 		this.use(Imagemin.svgo());
 	}
 
-	this.streams.unshift(this.read(this.src()));
-
 	if (this.dest()) {
-		this.streams.push(fs.dest(this.dest()));
+		this.streams.push(vfs.dest(this.dest()));
 	}
+	return combine(this.streams);
 
-	var pipe = combine(this.streams);
-	var end = concat(function (files) {
-		cb(null, files, pipe);
-	});
-
-	pipe.on('error', function(cb){console.error(cb)});
-	pipe.pipe(end);
 };
 
 /**
- * Read the source file
+ * Get files
  *
- * @param {Array|Buffer|String} src
  * @api private
  */
 
-Imagemin.prototype.read = function (src) {
-	if (Buffer.isBuffer(src)) {
-		var stream = through.obj();
-
-		stream.end(new File({
-			contents: src
-		}));
-
-		return stream;
+Imagemin.prototype.getFiles = function () {
+	if (Buffer.isBuffer(this.src())) {
+		return bufferToVinyl.stream(this.src());
 	}
 
-	return fs.src(src);
+	return vfs.src(this.src());
 };
 
 /**
@@ -129,10 +128,9 @@ module.exports = Imagemin;
 	'gifsicle',
 	'jpegtran',
 	'optipng',
-	'pngquant',
 	'svgo'
 ].forEach(function (plugin) {
 	module.exports[plugin] = optional('imagemin-' + plugin) || function () {
-		return through.ctor({ objectMode: true });
+		return through.ctor({objectMode: true});
 	};
 });
